@@ -45,7 +45,6 @@ public class ModernPinger implements Pinger {
         bootstrap.connect(request.hostname(), request.port())
                 .addListener((ChannelFutureListener) future -> {
                     if(!future.isSuccess()) {
-                        System.out.println("Unable to connect to server");
                         instance.complete(null);
                     }
                 });

@@ -33,5 +33,6 @@ subprojects.forEach { sp ->
     sp.tasks.test {
         useJUnitPlatform()
     }
+
 }
 

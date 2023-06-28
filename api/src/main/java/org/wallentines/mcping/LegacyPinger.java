@@ -51,7 +51,6 @@ public class LegacyPinger implements Pinger {
 
             } catch (SocketTimeoutException ex) {
 
-                System.out.println("Server connection timed out.");
                 res.complete(null);
 
             } catch (IOException ex) {
@@ -86,8 +85,7 @@ public class LegacyPinger implements Pinger {
 
         byte packetId = buffer.readByte();
         if(packetId != (byte) 0xFF) {
-            System.out.println("Unable to parse legacy ping response! Expected kick packet identifier!");
-            return null;
+            throw new IllegalArgumentException("Unable to parse legacy ping response! Expected kick packet identifier!");
         }
 
         try {
@@ -99,8 +97,7 @@ public class LegacyPinger implements Pinger {
 
             String[] fields = message.split("\u0000");
             if (fields.length != 6) {
-                System.out.println("Unable to parse legacy ping response! Expected 6 null-delineated fields, found " + fields.length + "!");
-                return null;
+                throw new IllegalArgumentException("Unable to parse legacy ping response! Expected 6 null-delineated fields, found " + fields.length + "!");
             }
 
             int protocolVersion = Integer.parseInt(fields[1]);
@@ -115,13 +112,11 @@ public class LegacyPinger implements Pinger {
 
         } catch (NumberFormatException ex) {
 
-            System.out.println("Unable to parse legacy ping response! An error occurred while parsing a number!");
-            return null;
+            throw new IllegalArgumentException("Unable to parse legacy ping response! An error occurred while parsing a number!");
 
         } catch (IndexOutOfBoundsException ex) {
 
-            System.out.println("Unable to parse legacy ping response! Attempt to read past the end of the buffer!");
-            return null;
+            throw new IllegalArgumentException("Unable to parse legacy ping response! Attempt to read past the end of the buffer!");
         }
     }
 }
