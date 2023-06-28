@@ -29,10 +29,10 @@ public class ModernPinger implements Pinger {
         Bootstrap bootstrap = new Bootstrap()
                 .group(group)
                 .channel(NioSocketChannel.class)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
+                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.connectTimeout())
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
-                    protected void initChannel(SocketChannel ch) throws Exception {
+                    protected void initChannel(SocketChannel ch) {
                         ch.pipeline()
                                 .addLast(new PacketSplitter())
                                 .addLast(new PacketDecoder())
@@ -71,7 +71,7 @@ public class ModernPinger implements Pinger {
             timeoutThread = new Thread(() -> {
 
                 try {
-                    Thread.sleep(10000L);
+                    Thread.sleep(request.pingTimeout());
                     instance.complete(null);
                 } catch (InterruptedException ex) {
                     // Ignore
@@ -90,7 +90,7 @@ public class ModernPinger implements Pinger {
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, Packet msg) throws Exception {
+        protected void channelRead0(ChannelHandlerContext ctx, Packet msg) {
 
             if(msg.packetId() != 0) {
                 instance.complete(null);

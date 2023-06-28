@@ -1,7 +1,6 @@
 package org.wallentines.mcping;
 
 import io.netty.buffer.ByteBuf;
-import io.netty.buffer.ByteBufUtil;
 import io.netty.buffer.Unpooled;
 
 import java.io.*;
@@ -21,7 +20,7 @@ public class LegacyPinger implements Pinger {
         new Thread(() -> {
             try(Socket socket = new Socket()) {
 
-                socket.connect(new InetSocketAddress(request.hostname(), request.port()), 10000);
+                socket.connect(new InetSocketAddress(request.hostname(), request.port()), request.connectTimeout());
                 InputStream is = socket.getInputStream();
                 OutputStream os = socket.getOutputStream();
 
@@ -32,7 +31,7 @@ public class LegacyPinger implements Pinger {
 
                 Thread timeoutThread = new Thread(() -> {
                     try {
-                        Thread.sleep(10000L);
+                        Thread.sleep(request.pingTimeout());
                         res.complete(null);
                     } catch (InterruptedException ex) {
                         // Ignore.

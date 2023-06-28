@@ -11,6 +11,8 @@ public class Main {
         ArgumentParser parser = new ArgumentParser()
                 .addOption("address", 'a', "localhost")
                 .addOption("port", 'p', "25565")
+                .addOption("connectTimeout", 'c', "10000")
+                .addOption("pingTimeout", 't', "2500")
                 .addFlag("legacy", 'l');
 
 
@@ -24,12 +26,14 @@ public class Main {
 
         String address = sec.getString("address");
         int port = Integer.parseInt(sec.getString("port"));
+        int connectTimeout = Integer.parseInt(sec.getString("connectTimeout"));
+        int pingTimeout = Integer.parseInt(sec.getString("pingTimeout"));
         boolean legacy = sec.getBoolean("legacy");
 
         Pinger pinger = legacy ? new LegacyPinger() : new ModernPinger();
 
         System.out.println("Attempting to ping " + address + ":" + port);
-        pinger.pingServer(new PingRequest(address, port)).thenAccept(res -> {
+        pinger.pingServer(new PingRequest(address, port, connectTimeout, pingTimeout)).thenAccept(res -> {
 
             System.out.println("Response received");
             if(res == null) {
