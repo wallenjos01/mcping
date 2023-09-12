@@ -24,8 +24,8 @@ subprojects.forEach { sp ->
 
         compileOnly("io.netty:netty-all:4.1.86.Final")
 
-        testImplementation("org.wallentines:midnightlib:1.0-SNAPSHOT")
-        testImplementation("org.wallentines:midnightcfg:1.0-SNAPSHOT")
+        testImplementation("org.wallentines:midnightlib:2.0.0-SNAPSHOT")
+        testImplementation("org.wallentines:midnightcfg:1.3.1-SNAPSHOT")
         testImplementation(platform("org.junit:junit-bom:5.9.2"))
         testImplementation("org.junit.jupiter:junit-jupiter:5.9.2")
     }

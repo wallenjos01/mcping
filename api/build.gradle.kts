@@ -25,7 +25,7 @@ publishing {
                 url = URI.create(project.properties["pubUrl"] as String)
                 credentials {
                     username = project.properties["pubUser"] as String
-                    username = project.properties["pubPass"] as String
+                    password = project.properties["pubPass"] as String
                 }
             }
         }
