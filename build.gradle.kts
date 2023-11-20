@@ -20,12 +20,14 @@ subprojects.forEach { sp ->
 
     sp.dependencies {
 
-        compileOnly("org.wallentines:midnightcfg:1.0-SNAPSHOT")
+        compileOnly("org.wallentines:midnightcfg-api:2.0.0-SNAPSHOT")
+        compileOnly("org.wallentines:midnightcfg-codec-json:2.0.0-SNAPSHOT")
 
         compileOnly("io.netty:netty-all:4.1.86.Final")
 
-        testImplementation("org.wallentines:midnightlib:2.0.0-SNAPSHOT")
-        testImplementation("org.wallentines:midnightcfg:1.3.1-SNAPSHOT")
+        testImplementation("org.wallentines:midnightlib:1.3.1-SNAPSHOT")
+        testImplementation("org.wallentines:midnightcfg-api:2.0.0-SNAPSHOT")
+        testImplementation("org.wallentines:midnightcfg-codec-json:2.0.0-SNAPSHOT")
         testImplementation(platform("org.junit:junit-bom:5.9.2"))
         testImplementation("org.junit.jupiter:junit-jupiter:5.9.2")
     }
