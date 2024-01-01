@@ -13,7 +13,8 @@ public class Main {
                 .addOption("port", 'p', "25565")
                 .addOption("connectTimeout", 'c', "10000")
                 .addOption("pingTimeout", 't', "2500")
-                .addFlag("legacy", 'l');
+                .addFlag("legacy", 'l')
+                .addFlag("haproxy", 'h');
 
 
         ArgumentParser.ParseResult result = parser.parse(args);
@@ -33,7 +34,7 @@ public class Main {
         Pinger pinger = legacy ? new LegacyPinger() : new ModernPinger();
 
         System.out.println("Attempting to ping " + address + ":" + port);
-        pinger.pingServer(new PingRequest(address, port, connectTimeout, pingTimeout)).thenAccept(res -> {
+        pinger.pingServer(new PingRequest(address, port, connectTimeout, pingTimeout, sec.getBoolean("haproxy"))).thenAccept(res -> {
 
             System.out.println("Response received");
             if(res == null) {

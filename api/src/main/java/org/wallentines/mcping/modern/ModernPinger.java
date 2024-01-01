@@ -10,9 +10,12 @@ import io.netty.channel.socket.nio.NioSocketChannel;
 import org.wallentines.mcping.PingRequest;
 import org.wallentines.mcping.PingResponse;
 import org.wallentines.mcping.Pinger;
+import org.wallentines.mcping.haproxy.HAProxyMessageEncoder;
+import org.wallentines.mcping.haproxy.ProxyMessage;
 import org.wallentines.mdcfg.ConfigSection;
 import org.wallentines.mdcfg.codec.JSONCodec;
 
+import java.net.SocketAddress;
 import java.util.concurrent.CompletableFuture;
 
 public class ModernPinger implements Pinger {
@@ -39,15 +42,23 @@ public class ModernPinger implements Pinger {
                                 .addLast(new LengthPrepender())
                                 .addLast(new PacketEncoder())
                                 .addLast(new PingHandler(request, instance));
+
+                        if(request.haproxy()) {
+                            ch.pipeline().addFirst(new HAProxyMessageEncoder());
+                        }
                     }
                 });
+
 
         bootstrap.connect(request.hostname(), request.port())
                 .addListener((ChannelFutureListener) future -> {
                     if(!future.isSuccess()) {
                         instance.complete(null);
                     }
-                });
+                }).channel();
+
+
+
 
         return out;
     }
@@ -77,6 +88,13 @@ public class ModernPinger implements Pinger {
                 }
             });
             timeoutThread.start();
+
+            if(request.haproxy()) {
+
+                SocketAddress local = ctx.channel().localAddress();
+                SocketAddress remote = ctx.channel().remoteAddress();
+                ctx.write(ProxyMessage.fromSockets(local, remote));
+            }
 
             ByteBuf handshakeData = Unpooled.buffer();
             PacketUtil.writeVarInt(handshakeData, -1);

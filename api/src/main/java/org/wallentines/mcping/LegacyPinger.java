@@ -2,10 +2,12 @@ package org.wallentines.mcping;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import org.wallentines.mcping.haproxy.ProxyMessage;
 
 import java.io.*;
 import java.net.InetSocketAddress;
 import java.net.Socket;
+import java.net.SocketAddress;
 import java.net.SocketTimeoutException;
 import java.nio.charset.StandardCharsets;
 import java.util.concurrent.CompletableFuture;
@@ -23,6 +25,12 @@ public class LegacyPinger implements Pinger {
                 socket.connect(new InetSocketAddress(request.hostname(), request.port()), request.connectTimeout());
                 InputStream is = socket.getInputStream();
                 OutputStream os = socket.getOutputStream();
+
+                if(request.haproxy()) {
+                    SocketAddress local = socket.getLocalSocketAddress();
+                    SocketAddress remote = socket.getRemoteSocketAddress();
+                    ProxyMessage.fromSockets(local, remote).writeV1(os);
+                }
 
                 ByteBuf out = Unpooled.buffer();
                 encode(request, out);
@@ -47,6 +55,12 @@ public class LegacyPinger implements Pinger {
                 }
 
                 timeoutThread.interrupt();
+
+                if(response.writerIndex() == 0) {
+                    res.complete(null);
+                    return;
+                }
+
                 res.complete(decode(response));
 
             } catch (SocketTimeoutException ex) {
