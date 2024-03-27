@@ -1,33 +1,16 @@
-import java.net.URI
-
 plugins {
-    id("maven-publish")
+    id("mcping-build")
+    id("mcping-publish")
 }
 
-val sourcesJar by tasks.registering(Jar::class) {
-    archiveClassifier.set("sources")
-    from(sourceSets.main.get().allSource)
-}
+dependencies {
 
-publishing {
-    publications {
-        register("mavenJava", MavenPublication::class) {
-            from(components["java"])
-            groupId = (project.parent as Project).group as String
-            artifactId = (project.parent as Project).name
-            version = (project.parent as Project).version as String
-            artifact(sourcesJar.get())
-        }
-    }
-    repositories {
-        maven {
-            if(project.hasProperty("pubUrl")) {
-                url = URI.create(project.properties["pubUrl"] as String)
-                credentials {
-                    username = project.properties["pubUser"] as String
-                    password = project.properties["pubPass"] as String
-                }
-            }
-        }
-    }
+    api(libs.midnight.cfg)
+    api(libs.midnight.cfg.json)
+    api(libs.netty.buffer)
+    api(libs.netty.codec)
+    api(libs.netty.codec.haproxy)
+    api(libs.slf4j.api)
+    api(libs.jetbrains.annotations)
+
 }

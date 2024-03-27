@@ -1,7 +1,7 @@
 plugins {
-    id("java")
+    id("mcping-build")
     id("application")
-    id("com.github.johnrengelman.shadow") version "8.1.1"
+    alias(libs.plugins.shadow)
 }
 
 configurations.create("shade").setExtendsFrom(listOf(configurations.getByName("implementation")))
@@ -10,16 +10,26 @@ application.mainClass.set("org.wallentines.mcping.Main")
 dependencies {
 
     implementation(project(":api"))
-    implementation("org.wallentines:midnightcfg:1.0-SNAPSHOT")
-    implementation("io.netty:netty-all:4.1.86.Final")
 
+    implementation(libs.midnight.cfg)
+    implementation(libs.netty.buffer)
+    implementation(libs.netty.codec)
+    implementation(libs.netty.codec.dns)
+    implementation(libs.netty.codec.haproxy)
+    implementation(libs.netty.common)
+    implementation(libs.netty.handler)
+    implementation(libs.slf4j.api)
+    implementation(libs.slf4j.simple)
+    compileOnly(libs.jetbrains.annotations)
 }
+
 
 java {
     manifest {
         attributes(Pair("Main-Class", application.mainClass))
     }
 }
+
 
 tasks.withType<JavaExec> {
 

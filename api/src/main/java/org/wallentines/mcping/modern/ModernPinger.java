@@ -7,15 +7,15 @@ import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
+import io.netty.handler.codec.haproxy.*;
 import org.wallentines.mcping.PingRequest;
 import org.wallentines.mcping.PingResponse;
 import org.wallentines.mcping.Pinger;
-import org.wallentines.mcping.haproxy.HAProxyMessageEncoder;
-import org.wallentines.mcping.haproxy.ProxyMessage;
 import org.wallentines.mdcfg.ConfigSection;
 import org.wallentines.mdcfg.codec.JSONCodec;
 
-import java.net.SocketAddress;
+import java.net.Inet4Address;
+import java.net.InetSocketAddress;
 import java.util.concurrent.CompletableFuture;
 
 public class ModernPinger implements Pinger {
@@ -44,7 +44,7 @@ public class ModernPinger implements Pinger {
                                 .addLast(new PingHandler(request, instance));
 
                         if(request.haproxy()) {
-                            ch.pipeline().addFirst(new HAProxyMessageEncoder());
+                            ch.pipeline().addFirst(HAProxyMessageEncoder.INSTANCE);
                         }
                     }
                 });
@@ -91,9 +91,23 @@ public class ModernPinger implements Pinger {
 
             if(request.haproxy()) {
 
-                SocketAddress local = ctx.channel().localAddress();
-                SocketAddress remote = ctx.channel().remoteAddress();
-                ctx.write(ProxyMessage.fromSockets(local, remote));
+                InetSocketAddress source = (InetSocketAddress) ctx.channel().localAddress();
+                InetSocketAddress dest = (InetSocketAddress) ctx.channel().remoteAddress();
+
+
+                HAProxyProxiedProtocol proto = source.getAddress() instanceof Inet4Address ?
+                        HAProxyProxiedProtocol.TCP4 :
+                        HAProxyProxiedProtocol.TCP6;
+
+                ctx.write(new HAProxyMessage(
+                        HAProxyProtocolVersion.V2,
+                        HAProxyCommand.PROXY,
+                        proto,
+                        source.getAddress().getHostAddress(),
+                        dest.getAddress().getHostAddress(),
+                        source.getPort(),
+                        dest.getPort()
+                ));
             }
 
             ByteBuf handshakeData = Unpooled.buffer();
@@ -103,12 +117,15 @@ public class ModernPinger implements Pinger {
             PacketUtil.writeVarInt(handshakeData, 1);
 
             ctx.write(new Packet(0, handshakeData)); // Handshake
-            ctx.writeAndFlush(new Packet(0, Unpooled.buffer())); // Status
+            ctx.writeAndFlush(new Packet(0, Unpooled.EMPTY_BUFFER)); // Status
         }
 
         @Override
         protected void channelRead0(ChannelHandlerContext ctx, Packet msg) {
 
+            if(timeoutThread != null) {
+                timeoutThread.interrupt();
+            }
             if(msg.packetId() != 0) {
                 instance.complete(null);
                 return;
@@ -118,9 +135,6 @@ public class ModernPinger implements Pinger {
             ConfigSection section = JSONCodec.loadConfig(json).asSection();
 
             instance.complete(PingResponse.parseModern(section));
-            if(timeoutThread != null) {
-                timeoutThread.interrupt();
-            }
         }
     }
 
