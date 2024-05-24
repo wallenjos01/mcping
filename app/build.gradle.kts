@@ -44,3 +44,17 @@ tasks.withType<JavaExec> {
 
     workingDir = File("run")
 }
+
+tasks.register<Copy>("copyFinalJar") {
+
+    dependsOn(tasks.shadowJar)
+    from(tasks.shadowJar.get().archiveFile)
+
+    var output = "build/output"
+    if(project.hasProperty("outputDir")) {
+        output = project.properties["outputDir"] as String
+    }
+
+    into(output)
+    rename("(.*)\\.jar", "${rootProject.name}.jar")
+}
