@@ -4,22 +4,31 @@ plugins {
     alias(libs.plugins.shadow)
 }
 
-configurations.create("shade").setExtendsFrom(listOf(configurations.getByName("implementation")))
+configurations.shadow {
+    extendsFrom(configurations.implementation.get())
+}
 application.mainClass.set("org.wallentines.mcping.Main")
+
+tasks.jar {
+    archiveClassifier.set("partial")
+}
+
+tasks.shadowJar {
+    archiveClassifier.set("")
+}
 
 dependencies {
 
-    implementation(project(":api"))
+    implementation(project(":api")) { isTransitive = false }
 
-    implementation(libs.midnight.cfg)
+    implementation(libs.midnight.cfg) { isTransitive = false }
+    implementation(libs.midnight.cfg.json) { isTransitive = false }
     implementation(libs.netty.buffer)
     implementation(libs.netty.codec)
     implementation(libs.netty.codec.dns)
     implementation(libs.netty.codec.haproxy)
     implementation(libs.netty.common)
     implementation(libs.netty.handler)
-    implementation(libs.slf4j.api)
-    implementation(libs.slf4j.simple)
     compileOnly(libs.jetbrains.annotations)
 }
 

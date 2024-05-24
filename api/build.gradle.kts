@@ -10,7 +10,6 @@ dependencies {
     api(libs.netty.buffer)
     api(libs.netty.codec)
     api(libs.netty.codec.haproxy)
-    api(libs.slf4j.api)
     api(libs.jetbrains.annotations)
 
 }
