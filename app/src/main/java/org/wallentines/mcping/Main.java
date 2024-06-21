@@ -39,12 +39,11 @@ public class Main {
             System.out.println("Response received");
             if(res == null) {
                 System.out.println("Received null response.");
-                System.exit(1);
+                return;
             }
 
-            System.out.printf("Players: %d/%d%n", res.onlinePlayers(), res.maxPlayers());
-            System.out.printf("Description: %s%n", res.description());
-            System.exit(0);
+            System.out.printf("Players: %d/%d%n", res.playersOnline(), res.maxPlayers());
+            System.out.printf("Description: %s%n", res.motd());
         });
 
     }

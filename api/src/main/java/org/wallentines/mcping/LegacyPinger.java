@@ -2,6 +2,8 @@ package org.wallentines.mcping;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.wallentines.mcping.haproxy.ProxyMessage;
 
 import java.io.*;
@@ -14,10 +16,12 @@ import java.util.concurrent.CompletableFuture;
 
 public class LegacyPinger implements Pinger {
 
-    @Override
-    public CompletableFuture<PingResponse> pingServer(PingRequest request) {
+    private static final Logger log = LoggerFactory.getLogger(LegacyPinger.class);
 
-        CompletableFuture<PingResponse> res = new CompletableFuture<>();
+    @Override
+    public CompletableFuture<StatusMessage> pingServer(PingRequest request) {
+
+        CompletableFuture<StatusMessage> res = new CompletableFuture<>();
 
         new Thread(() -> {
             try(Socket socket = new Socket()) {
@@ -68,7 +72,7 @@ public class LegacyPinger implements Pinger {
                 res.complete(null);
 
             } catch (IOException ex) {
-                ex.printStackTrace();
+                log.error("An exception occurred while handling a legacy ping!", ex);
                 res.complete(null);
             }
         }).start();
@@ -95,7 +99,7 @@ public class LegacyPinger implements Pinger {
 
     }
 
-    private static PingResponse decode(ByteBuf buffer) {
+    private static StatusMessage decode(ByteBuf buffer) {
 
         byte packetId = buffer.readByte();
         if(packetId != (byte) 0xFF) {
@@ -122,7 +126,7 @@ public class LegacyPinger implements Pinger {
             int onlinePlayers = Integer.parseInt(fields[4]);
             int maxPlayers = Integer.parseInt(fields[5]);
 
-            return PingResponse.fromLegacy(version, motd, onlinePlayers, maxPlayers);
+            return StatusMessage.fromLegacy(version, motd, onlinePlayers, maxPlayers);
 
         } catch (NumberFormatException ex) {
 

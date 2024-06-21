@@ -29,6 +29,8 @@ dependencies {
     implementation(libs.netty.codec.haproxy)
     implementation(libs.netty.common)
     implementation(libs.netty.handler)
+    implementation(libs.slf4j.api)
+    implementation(libs.slf4j.simple)
     compileOnly(libs.jetbrains.annotations)
 }
 

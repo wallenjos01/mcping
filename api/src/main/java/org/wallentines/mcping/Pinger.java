@@ -4,6 +4,6 @@ import java.util.concurrent.CompletableFuture;
 
 public interface Pinger {
 
-    CompletableFuture<PingResponse> pingServer(PingRequest request);
+    CompletableFuture<StatusMessage> pingServer(PingRequest request);
 
 }

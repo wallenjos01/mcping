@@ -1,18 +1,15 @@
 package org.wallentines.mcping.modern;
 
 import io.netty.bootstrap.Bootstrap;
-import io.netty.buffer.ByteBuf;
-import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.channel.socket.nio.NioSocketChannel;
 import io.netty.handler.codec.haproxy.*;
 import org.wallentines.mcping.PingRequest;
-import org.wallentines.mcping.PingResponse;
 import org.wallentines.mcping.Pinger;
-import org.wallentines.mdcfg.ConfigSection;
-import org.wallentines.mdcfg.codec.JSONCodec;
+import org.wallentines.mcping.StatusMessage;
+import org.wallentines.mcping.modern.protocol.*;
 
 import java.net.Inet4Address;
 import java.net.InetSocketAddress;
@@ -22,12 +19,14 @@ public class ModernPinger implements Pinger {
 
 
     @Override
-    public CompletableFuture<PingResponse> pingServer(PingRequest request) {
+    public CompletableFuture<StatusMessage> pingServer(PingRequest request) {
 
-        CompletableFuture<PingResponse> out = new CompletableFuture<>();
+        CompletableFuture<StatusMessage> out = new CompletableFuture<>();
 
         EventLoopGroup group = new NioEventLoopGroup();
-        PingInstance instance = new PingInstance(out, group);
+        PingInstance instance = new PingInstance(out);
+
+        PacketEncoder<ServerboundPacketHandler> encoder = new PacketEncoder<>(PacketRegistry.HANDSHAKE);
 
         Bootstrap bootstrap = new Bootstrap()
                 .group(group)
@@ -37,11 +36,11 @@ public class ModernPinger implements Pinger {
                     @Override
                     protected void initChannel(SocketChannel ch) {
                         ch.pipeline()
-                                .addLast(new PacketSplitter())
-                                .addLast(new PacketDecoder())
-                                .addLast(new LengthPrepender())
-                                .addLast(new PacketEncoder())
-                                .addLast(new PingHandler(request, instance));
+                                .addLast(new FrameDecoder())
+                                .addLast(new PacketDecoder<>(PacketRegistry.STATUS_CLIENTBOUND))
+                                .addLast(new FrameEncoder())
+                                .addLast(encoder)
+                                .addLast(new PacketHandler<>(new PingHandler(ch, instance)));
 
                         if(request.haproxy()) {
                             ch.pipeline().addFirst(HAProxyMessageEncoder.INSTANCE);
@@ -55,7 +54,40 @@ public class ModernPinger implements Pinger {
                     if(!future.isSuccess()) {
                         instance.complete(null);
                     }
-                }).channel();
+
+                    Channel channel = future.channel();
+
+                    // Send HAProxy
+                    if(request.haproxy()) {
+
+                        InetSocketAddress source = (InetSocketAddress) channel.localAddress();
+                        InetSocketAddress dest = (InetSocketAddress) channel.remoteAddress();
+
+
+                        HAProxyProxiedProtocol proto = source.getAddress() instanceof Inet4Address ?
+                                HAProxyProxiedProtocol.TCP4 :
+                                HAProxyProxiedProtocol.TCP6;
+
+                        channel.write(new HAProxyMessage(
+                                HAProxyProtocolVersion.V2,
+                                HAProxyCommand.PROXY,
+                                proto,
+                                source.getAddress().getHostAddress(),
+                                dest.getAddress().getHostAddress(),
+                                source.getPort(),
+                                dest.getPort()
+                        ));
+                    }
+
+                    // Send ping
+                    channel.write(new ServerboundHandshakePacket(767, request.hostname(), request.port(), ServerboundHandshakePacket.Intent.STATUS));
+                    encoder.setRegistry(PacketRegistry.STATUS_SERVERBOUND);
+                    channel.writeAndFlush(new ServerboundStatusPacket());
+
+                })
+                .channel()
+                .closeFuture()
+                        .addListener(future -> group.shutdownGracefully());
 
 
 
@@ -63,96 +95,53 @@ public class ModernPinger implements Pinger {
         return out;
     }
 
-    private static class PingHandler extends SimpleChannelInboundHandler<Packet> {
+    private static class PingHandler implements ClientboundPacketHandler {
 
         private final PingInstance instance;
-        private final PingRequest request;
-        private Thread timeoutThread;
+        private final Channel channel;
 
-        public PingHandler(PingRequest request, PingInstance instance) {
-            this.request = request;
+        public PingHandler(Channel channel, PingInstance instance) {
+            this.channel = channel;
             this.instance = instance;
         }
 
         @Override
-        public void channelActive(ChannelHandlerContext ctx) throws Exception {
-            super.channelActive(ctx);
+        public void handle(ClientboundPingPacket ping) {
 
-            timeoutThread = new Thread(() -> {
-
-                try {
-                    Thread.sleep(request.pingTimeout());
-                    instance.complete(null);
-                } catch (InterruptedException ex) {
-                    // Ignore
-                }
-            });
-            timeoutThread.start();
-
-            if(request.haproxy()) {
-
-                InetSocketAddress source = (InetSocketAddress) ctx.channel().localAddress();
-                InetSocketAddress dest = (InetSocketAddress) ctx.channel().remoteAddress();
-
-
-                HAProxyProxiedProtocol proto = source.getAddress() instanceof Inet4Address ?
-                        HAProxyProxiedProtocol.TCP4 :
-                        HAProxyProxiedProtocol.TCP6;
-
-                ctx.write(new HAProxyMessage(
-                        HAProxyProtocolVersion.V2,
-                        HAProxyCommand.PROXY,
-                        proto,
-                        source.getAddress().getHostAddress(),
-                        dest.getAddress().getHostAddress(),
-                        source.getPort(),
-                        dest.getPort()
-                ));
-            }
-
-            ByteBuf handshakeData = Unpooled.buffer();
-            PacketUtil.writeVarInt(handshakeData, -1);
-            PacketUtil.writeUtf(handshakeData, request.hostname());
-            handshakeData.writeShort(25565);
-            PacketUtil.writeVarInt(handshakeData, 1);
-
-            ctx.write(new Packet(0, handshakeData)); // Handshake
-            ctx.writeAndFlush(new Packet(0, Unpooled.EMPTY_BUFFER)); // Status
         }
 
         @Override
-        protected void channelRead0(ChannelHandlerContext ctx, Packet msg) {
-
-            if(timeoutThread != null) {
-                timeoutThread.interrupt();
-            }
-            if(msg.packetId() != 0) {
-                instance.complete(null);
-                return;
-            }
-
-            String json = PacketUtil.readUtf(msg.data());
-            ConfigSection section = JSONCodec.loadConfig(json).asSection();
-
-            instance.complete(PingResponse.parseModern(section));
+        public void handle(ClientboundStatusPacket status) {
+            channel.close();
+            instance.complete(StatusMessage.deserialize(status.data()));
         }
     }
 
     private static class PingInstance {
 
-        private final CompletableFuture<PingResponse> response;
-        private final EventLoopGroup group;
+        private final CompletableFuture<StatusMessage> response;
+        private final Thread timeoutThread;
 
-        public PingInstance(CompletableFuture<PingResponse> response, EventLoopGroup group) {
+        public PingInstance(CompletableFuture<StatusMessage> response) {
             this.response = response;
-            this.group = group;
+            this.timeoutThread = new Thread(() -> {
+                try {
+                    Thread.sleep(5000);
+                } catch (InterruptedException ex) {
+                    // Ignore
+                }
+
+                if(!this.response.isDone()) {
+                    this.response.complete(null);
+                }
+            });
         }
 
-        public void complete(PingResponse response) {
+        public void complete(StatusMessage response) {
             if(!this.response.isDone()) {
                 this.response.complete(response);
             }
-            group.shutdownGracefully();
+            this.timeoutThread.interrupt();
         }
     }
 }

@@ -1,4 +1,4 @@
-package org.wallentines.mcping.modern;
+package org.wallentines.mcping.modern.protocol;
 
 import io.netty.buffer.ByteBuf;
 import io.netty.handler.codec.DecoderException;
