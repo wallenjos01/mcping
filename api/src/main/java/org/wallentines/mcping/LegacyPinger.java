@@ -86,13 +86,13 @@ public class LegacyPinger implements Pinger {
         buffer.writeByte(0xFE); // Ping packet ID
         buffer.writeByte(0x01); // Ping payload
         buffer.writeByte(0xFA); // Plugin message packet ID
-        buffer.writeShort(11); // Length of plugin message type
-        buffer.writeBytes("MC|PingHost".getBytes(StandardCharsets.UTF_16BE)); // Plugin message type
+        buffer.writeShort(11); // Length of plugin message channel
+        buffer.writeBytes("MC|PingHost".getBytes(StandardCharsets.UTF_16BE)); // Plugin message channel
 
         byte[] hostnameData = request.hostname().getBytes(StandardCharsets.UTF_16BE);
 
         buffer.writeShort(7 + hostnameData.length); // Remaining data length
-        buffer.writeByte(0x49); // Protocol Version (0x4A == the last protocol version using this ping request style)
+        buffer.writeByte(78); // Protocol Version (1.6.4)
         buffer.writeShort(request.hostname().length()); // Hostname length
         buffer.writeBytes(hostnameData); // Hostname
         buffer.writeInt(request.port()); // Port
