@@ -1,21 +1,10 @@
 plugins {
-    id("mcping-build")
-    id("application")
-    alias(libs.plugins.shadow)
+    id("build.application")
+    id("build.library")
+    id("build.shadow")
 }
 
-configurations.shadow {
-    extendsFrom(configurations.implementation.get())
-}
 application.mainClass.set("org.wallentines.mcping.Main")
-
-tasks.jar {
-    archiveClassifier.set("partial")
-}
-
-tasks.shadowJar {
-    archiveClassifier.set("")
-}
 
 dependencies {
 
@@ -31,32 +20,18 @@ dependencies {
     implementation(libs.netty.handler)
     implementation(libs.slf4j.api)
     implementation(libs.slf4j.simple)
-    compileOnly(libs.jetbrains.annotations)
-}
 
+    shadow(project(":api")) { isTransitive = false }
 
-java {
-    manifest {
-        attributes(Pair("Main-Class", application.mainClass))
-    }
-}
+    shadow(libs.midnight.cfg) { isTransitive = false }
+    shadow(libs.midnight.cfg.json) { isTransitive = false }
+    shadow(libs.netty.buffer)
+    shadow(libs.netty.codec)
+    shadow(libs.netty.codec.dns)
+    shadow(libs.netty.codec.haproxy)
+    shadow(libs.netty.common)
+    shadow(libs.netty.handler)
+    shadow(libs.slf4j.api)
+    shadow(libs.slf4j.simple)
 
-
-tasks.withType<JavaExec> {
-
-    workingDir = File("run")
-}
-
-tasks.register<Copy>("copyFinalJar") {
-
-    dependsOn(tasks.shadowJar)
-    from(tasks.shadowJar.get().archiveFile)
-
-    var output = "build/output"
-    if(project.hasProperty("outputDir")) {
-        output = project.properties["outputDir"] as String
-    }
-
-    into(output)
-    rename("(.*)\\.jar", "${rootProject.name}.jar")
 }
