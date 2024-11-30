@@ -63,9 +63,12 @@ public class Main {
                 .exceptionally(th -> null)
                 .join();
 
-        if(message == null) return 1;
+        if(message == null) {
+            log("Unable to ping server.");
+            return 1;
+        }
 
-        log("Players: " + message.playerSample() + "/" + message.maxPlayers());
+        log("Players: " + message.playersOnline() + "/" + message.maxPlayers());
         log("Motd: " + message.motd());
 
         return 0;
