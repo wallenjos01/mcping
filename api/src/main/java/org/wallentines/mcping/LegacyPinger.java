@@ -26,7 +26,7 @@ public class LegacyPinger implements Pinger {
         new Thread(() -> {
             try(Socket socket = new Socket()) {
 
-                socket.connect(new InetSocketAddress(request.hostname(), request.port()), request.connectTimeout());
+                socket.connect(new InetSocketAddress(request.hostname(), request.port()), 0);
                 InputStream is = socket.getInputStream();
                 OutputStream os = socket.getOutputStream();
 
@@ -41,24 +41,12 @@ public class LegacyPinger implements Pinger {
 
                 os.write(out.array());
 
-                Thread timeoutThread = new Thread(() -> {
-                    try {
-                        Thread.sleep(request.pingTimeout());
-                        res.complete(null);
-                    } catch (InterruptedException ex) {
-                        // Ignore.
-                    }
-                });
-                timeoutThread.start();
-
                 ByteBuf response = Unpooled.buffer();
                 byte[] buffer = new byte[1024];
                 int bytesRead;
                 while((bytesRead = is.read(buffer)) != -1) {
                     response.writeBytes(buffer, 0, bytesRead);
                 }
-
-                timeoutThread.interrupt();
 
                 if(response.writerIndex() == 0) {
                     res.complete(null);

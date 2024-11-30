@@ -24,14 +24,11 @@ public class ModernPinger implements Pinger {
         CompletableFuture<StatusMessage> out = new CompletableFuture<>();
 
         EventLoopGroup group = new NioEventLoopGroup();
-        PingInstance instance = new PingInstance(out);
-
         PacketEncoder<ServerboundPacketHandler> encoder = new PacketEncoder<>(PacketRegistry.HANDSHAKE);
 
         Bootstrap bootstrap = new Bootstrap()
                 .group(group)
                 .channel(NioSocketChannel.class)
-                .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, request.connectTimeout())
                 .handler(new ChannelInitializer<SocketChannel>() {
                     @Override
                     protected void initChannel(SocketChannel ch) {
@@ -40,7 +37,7 @@ public class ModernPinger implements Pinger {
                                 .addLast(new PacketDecoder<>(PacketRegistry.STATUS_CLIENTBOUND))
                                 .addLast(new FrameEncoder())
                                 .addLast(encoder)
-                                .addLast(new PacketHandler<>(new PingHandler(ch, instance)));
+                                .addLast(new PacketHandler<>(new PingHandler(ch, out)));
 
                         if(request.haproxy()) {
                             ch.pipeline().addFirst(HAProxyMessageEncoder.INSTANCE);
@@ -52,7 +49,7 @@ public class ModernPinger implements Pinger {
         bootstrap.connect(request.hostname(), request.port())
                 .addListener((ChannelFutureListener) future -> {
                     if(!future.isSuccess()) {
-                        instance.complete(null);
+                        out.completeExceptionally(new RuntimeException(future.cause()));
                     }
 
                     Channel channel = future.channel();
@@ -62,7 +59,6 @@ public class ModernPinger implements Pinger {
 
                         InetSocketAddress source = (InetSocketAddress) channel.localAddress();
                         InetSocketAddress dest = (InetSocketAddress) channel.remoteAddress();
-
 
                         HAProxyProxiedProtocol proto = source.getAddress() instanceof Inet4Address ?
                                 HAProxyProxiedProtocol.TCP4 :
@@ -80,7 +76,7 @@ public class ModernPinger implements Pinger {
                     }
 
                     // Send ping
-                    channel.write(new ServerboundHandshakePacket(767, request.hostname(), request.port(), ServerboundHandshakePacket.Intent.STATUS));
+                    channel.write(new ServerboundHandshakePacket(768, request.hostname(), request.port(), ServerboundHandshakePacket.Intent.STATUS));
                     encoder.setRegistry(PacketRegistry.STATUS_SERVERBOUND);
                     channel.writeAndFlush(new ServerboundStatusPacket());
 
@@ -97,12 +93,12 @@ public class ModernPinger implements Pinger {
 
     private static class PingHandler implements ClientboundPacketHandler {
 
-        private final PingInstance instance;
+        private final CompletableFuture<StatusMessage> future;
         private final Channel channel;
 
-        public PingHandler(Channel channel, PingInstance instance) {
+        public PingHandler(Channel channel, CompletableFuture<StatusMessage> future) {
             this.channel = channel;
-            this.instance = instance;
+            this.future = future;
         }
 
         @Override
@@ -113,35 +109,7 @@ public class ModernPinger implements Pinger {
         @Override
         public void handle(ClientboundStatusPacket status) {
             channel.close();
-            instance.complete(StatusMessage.deserialize(status.data()));
-        }
-    }
-
-    private static class PingInstance {
-
-        private final CompletableFuture<StatusMessage> response;
-        private final Thread timeoutThread;
-
-        public PingInstance(CompletableFuture<StatusMessage> response) {
-            this.response = response;
-            this.timeoutThread = new Thread(() -> {
-                try {
-                    Thread.sleep(5000);
-                } catch (InterruptedException ex) {
-                    // Ignore
-                }
-
-                if(!this.response.isDone()) {
-                    this.response.complete(null);
-                }
-            });
-        }
-
-        public void complete(StatusMessage response) {
-            if(!this.response.isDone()) {
-                this.response.complete(response);
-            }
-            this.timeoutThread.interrupt();
+            future.complete(StatusMessage.deserialize(status.data()));
         }
     }
 }

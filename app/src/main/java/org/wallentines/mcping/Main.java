@@ -4,6 +4,8 @@ package org.wallentines.mcping;
 import org.wallentines.mcping.modern.ModernPinger;
 import org.wallentines.mdcfg.ConfigSection;
 
+import java.util.concurrent.TimeUnit;
+
 public class Main {
 
     public static void main(String[] args) {
@@ -11,10 +13,10 @@ public class Main {
         ArgumentParser parser = new ArgumentParser()
                 .addOption("address", 'a', "localhost")
                 .addOption("port", 'p', "25565")
-                .addOption("connectTimeout", 'c', "10000")
-                .addOption("pingTimeout", 't', "2500")
+                .addOption("timeout", 't', "10000")
                 .addFlag("legacy", 'l')
-                .addFlag("haproxy", 'h');
+                .addFlag("haproxy", 'h')
+                .addFlag("quiet", 'q');
 
 
         ArgumentParser.ParseResult result = parser.parse(args);
@@ -24,28 +26,50 @@ public class Main {
         }
 
         ConfigSection sec = result.getOutput().toConfigSection();
+        System.exit(new Main(sec).ping());
+    }
 
-        String address = sec.getString("address");
-        int port = Integer.parseInt(sec.getString("port"));
-        int connectTimeout = Integer.parseInt(sec.getString("connectTimeout"));
-        int pingTimeout = Integer.parseInt(sec.getString("pingTimeout"));
-        boolean legacy = sec.getBoolean("legacy");
+    private final String address;
+    private final int port;
+    private final long timeout;
+    private final boolean haproxy;
+    private final boolean legacy;
+    private final boolean quiet;
+
+    private Main(ConfigSection config) {
+
+        address = config.getString("address");
+        port = Integer.parseInt(config.getString("port"));
+        timeout = Long.parseLong(config.getString("timeout"));
+        haproxy = config.getBoolean("haproxy");
+        legacy = config.getBoolean("legacy");
+        quiet = config.getBoolean("quiet");
+
+    }
+
+    private void log(String message) {
+        if(!quiet) {
+            System.out.println(message);
+        }
+    }
+
+    private int ping() {
 
         Pinger pinger = legacy ? new LegacyPinger() : new ModernPinger();
 
-        System.out.println("Attempting to ping " + address + ":" + port);
-        pinger.pingServer(new PingRequest(address, port, connectTimeout, pingTimeout, sec.getBoolean("haproxy"))).thenAccept(res -> {
+        log("Attempting to ping " + address + ":" + port);
+        StatusMessage message = pinger.pingServer(new PingRequest(address, port, haproxy))
+                .orTimeout(timeout, TimeUnit.MILLISECONDS)
+                .exceptionally(th -> null)
+                .join();
 
-            System.out.println("Response received");
-            if(res == null) {
-                System.out.println("Received null response.");
-                return;
-            }
+        if(message == null) return 1;
 
-            System.out.printf("Players: %d/%d%n", res.playersOnline(), res.maxPlayers());
-            System.out.printf("Description: %s%n", res.motd());
-        });
+        log("Players: " + message.playerSample() + "/" + message.maxPlayers());
+        log("Motd: " + message.motd());
 
+        return 0;
     }
+
 
 }
